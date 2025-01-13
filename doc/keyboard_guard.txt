@@ -1,0 +1,70 @@
+*keyboard_guard.txt*  Prevent unintended actions in non-English layouts
+
+==============================================================================
+CONTENTS                                                *keyboard-guard-contents*
+
+    1. Introduction ......... |keyboard-guard-introduction|
+    2. Requirements ......... |keyboard-guard-requirements|
+    3. Setup ............... |keyboard-guard-setup|
+    4. Configuration ....... |keyboard-guard-configuration|
+    5. Commands ............ |keyboard-guard-commands|
+    6. Troubleshooting ..... |keyboard-guard-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                    *keyboard-guard-introduction*
+
+keyboard-guard is a lightweight Neovim plugin that prevents unintended actions
+when typing with non-English keyboard layouts.
+
+==============================================================================
+2. REQUIREMENTS                                    *keyboard-guard-requirements*
+
+- Neovim >= 0.8.0
+- For X11: xset
+- For Wayland/Sway: swaymsg
+- For Windows: PowerShell
+- For macOS: defaults command
+
+==============================================================================
+3. SETUP                                                *keyboard-guard-setup*
+
+You can setup the plugin with its default configuration: >
+
+    require('keyboard_guard').setup()
+<
+
+Or with custom options: >
+
+    require('keyboard_guard').setup({
+        protect_cmdline = true,
+        protect_normal = true
+    })
+<
+
+==============================================================================
+4. CONFIGURATION                                  *keyboard-guard-configuration*
+
+                                                *keyboard-guard-protect_cmdline*
+protect_cmdline (default: true)
+    Protect command-line mode from non-English input.
+
+                                                *keyboard-guard-protect_normal*
+protect_normal (default: true)
+    Protect normal mode from non-English input.
+
+==============================================================================
+5. COMMANDS                                          *keyboard-guard-commands*
+
+The plugin doesn't add any commands by default.
+
+==============================================================================
+6. TROUBLESHOOTING                              *keyboard-guard-troubleshooting*
+
+Q: The plugin isn't detecting my layout correctly
+A: Make sure you have the required system commands available for your environment
+
+Q: I want to temporarily disable the plugin
+A: You can call :lua vim.g.keyboard_guard_enabled = false
+
+==============================================================================
+vim:ft=help:et:ts=4:sw=4:sts=4:norl:
