@@ -1,140 +1,140 @@
+-- lua/keyboard_guard/init.lua
 local M = {}
 
--- Minimal initial state
+-- State management
 local state = {
-	layout_detector = nil,
-	notification_handler = nil,
+	enabled = true,
+	env = nil,
+	detector = nil,
+	notify_fn = nil,
 }
 
--- Cached environment check (only computed once)
-local function get_environment()
-	if state.env then
-		return state.env
-	end
-
-	-- Quick checks in order of likelihood
-	if vim.env.DISPLAY then
-		state.env = "x11"
-	elseif vim.env.WAYLAND_DISPLAY then
-		state.env = "wayland"
-	elseif vim.fn.has("win32") == 1 then
-		state.env = "windows"
-	elseif vim.fn.has("mac") == 1 then
-		state.env = "macos"
-	else
-		state.env = "unknown"
-	end
-
-	return state.env
-end
-
--- Efficient layout detectors (only load what's needed for current environment)
-local layout_detectors = {
-	x11 = function()
-		-- Most efficient X11 check using xset
-		return vim.fn.system("xset -q | grep LED | awk '{print $10}' | cut -c5"):gsub("%s+", "") == "0"
-	end,
-
-	wayland = function()
-		-- Minimal Wayland check
-		if vim.fn.executable("swaymsg") == 1 then
-			return vim.fn
-				.system([[swaymsg -t get_inputs | grep "xkb_active_layout_name" | head -1 | cut -d'"' -f4]])
-				:match("^[Ee]nglish")
-		end
-		return true -- Fallback if can't detect
-	end,
-
-	windows = function()
-		-- Efficient Windows check using simpler PowerShell command
-		local layout = vim.fn.system(
-			[[powershell -c "Get-WinUserLanguageList | Select-Object -First 1 | Select-Object -ExpandProperty LanguageTag"]]
-		)
-		return layout:match("^en")
-	end,
-
-	macos = function()
-		-- Simplified macOS check
-		local layout = vim.fn.system(
-			[[defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleCurrentKeyboardLayoutInputSourceID]]
-		)
-		return layout:match("US") or layout:match("ABC")
-	end,
+-- Default configuration
+local defaults = {
+	notification = {
+		enabled = true,
+		style = "minimal",
+		message = "Please switch to English layout!",
+		level = vim.log.levels.WARN,
+	},
+	modes = {
+		n = true,
+		i = false,
+		c = true,
+	},
 }
 
--- Efficient layout checking
-local function is_layout_english()
-	if not state.layout_detector then
-		local env = get_environment()
-		state.layout_detector = layout_detectors[env]
+-- Layout detection
+local function is_english()
+	if not state.enabled then
+		return true
 	end
-
-	if state.layout_detector then
-		return state.layout_detector()
-	end
-	return true -- Fallback to allowing if we can't detect
+	local layout = vim.fn.system("xset -q | grep LED | awk '{print $10}' | cut -c5"):gsub("%s+", "")
+	return layout == "0"
 end
 
--- Setup notification handler (lazy loaded)
-local function get_notification_handler()
-	if state.notification_handler then
-		return state.notification_handler
-	end
-
-	-- Try to use noice.nvim if available
-	local has_noice, _ = pcall(require, "noice")
-	if has_noice then
-		state.notification_handler = function(msg)
-			vim.notify(msg, vim.log.levels.WARN, {
-				title = "Keyboard Layout",
-				timeout = 1000,
-			})
+-- Notification setup
+local function setup_notify(opts)
+	if opts.notification.style == "minimal" then
+		return function(msg)
+			vim.cmd("echohl WarningMsg")
+			vim.cmd(string.format('echo "%s"', msg:gsub('"', '\\"')))
+			vim.cmd("echohl None")
 		end
 	else
-		-- Fallback to simple notify
-		state.notification_handler = function(msg)
-			vim.notify(msg, vim.log.levels.WARN)
+		return function(msg)
+			vim.notify(msg, opts.notification.level)
 		end
 	end
-
-	return state.notification_handler
 end
 
--- Main keypress handler
-local function handle_keypress()
-	if not is_layout_english() then
-		get_notification_handler()("Please switch to English layout")
+-- Key handling with debounce
+local last_notify_time = 0
+local function handle_key()
+	if not is_english() then
+		local current_time = vim.loop.now()
+		-- Only notify if 500ms have passed since last notification
+		if current_time - last_notify_time > 500 then
+			if state.notify_fn then
+				state.notify_fn(M.config.notification.message)
+				last_notify_time = current_time
+			end
+		end
 		return true
 	end
 	return false
 end
 
--- Minimal setup with efficient autocommands
-function M.setup(opts)
-	opts = opts or {}
+-- Setup key handlers for normal mode
+local function setup_normal_mode_handler()
+	-- Use vim.on_key to catch ALL keypresses in normal mode
+	vim.on_key(function(key)
+		if vim.fn.mode() == "n" and handle_key() then
+			-- Cancel the keypress by sending Escape
+			vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
+		end
+	end)
+end
 
-	-- Single autogroup for all autocommands
+-- Setup function
+function M.setup(opts)
+	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
+
+	-- Setup notification handler
+	state.notify_fn = setup_notify(M.config)
+
+	-- Create autogroup
 	local group = vim.api.nvim_create_augroup("KeyboardGuard", { clear = true })
 
-	-- Only create autocommands that are needed
-	if opts.protect_cmdline ~= false then
-		vim.api.nvim_create_autocmd("CmdlineEnter", {
-			group = group,
-			callback = handle_keypress,
-		})
+	-- Handle normal mode
+	if M.config.modes.n then
+		setup_normal_mode_handler()
 	end
 
-	-- Protect normal mode operations efficiently
-	if opts.protect_normal ~= false then
-		vim.api.nvim_create_autocmd("BufEnter", {
+	-- Handle command mode
+	if M.config.modes.c then
+		vim.api.nvim_create_autocmd("CmdlineEnter", {
+			group = group,
+			callback = handle_key,
+		})
+
+		-- Also catch command-line inputs
+		vim.api.nvim_create_autocmd("CmdlineChanged", {
 			group = group,
 			callback = function()
-				vim.keymap.set("n", ".", function()
-					return handle_keypress() and "" or "."
-				end, { expr = true, buffer = true })
+				if handle_key() then
+					-- Exit command mode if non-English
+					vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
+				end
 			end,
 		})
 	end
+
+	-- Handle insert mode
+	if M.config.modes.i then
+		vim.api.nvim_create_autocmd("InsertCharPre", {
+			group = group,
+			callback = function()
+				if handle_key() then
+					vim.v.char = ""
+				end
+			end,
+		})
+	end
+
+	-- Add debug commands
+	vim.api.nvim_create_user_command("KGStatus", function()
+		local layout = vim.fn.system("xset -q | grep LED | awk '{print $10}' | cut -c5"):gsub("%s+", "")
+		local mode = vim.fn.mode()
+		vim.notify(
+			string.format(
+				"Keyboard Guard Status:\nEnabled: %s\nCurrent Layout: %s\nCurrent Mode: %s",
+				tostring(state.enabled),
+				layout == "0" and "English" or "Non-English",
+				mode
+			)
+		)
+	end, {})
 end
 
-return m
+return M

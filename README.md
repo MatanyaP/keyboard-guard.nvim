@@ -20,7 +20,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-    "yourusername/keyboard-guard.nvim",
+    "MatanyaP/keyboard-guard.nvim",
     event = "VeryLazy",
     opts = {
         -- your configuration
