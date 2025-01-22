@@ -32,7 +32,7 @@ Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
 
 ```lua
 use {
-    'yourusername/keyboard-guard.nvim',
+    'MatanyaP/keyboard-guard.nvim',
     config = function()
         require('keyboard_guard').setup({
             -- your configuration
