@@ -1,0 +1,11 @@
+{
+  "plugins": {
+    "keyboard-guard.nvim": {
+      "name": "keyboard-guard.nvim",
+      "description": "Prevents unintended actions when typing in non-English keyboard layouts",
+      "repository": "MatanyaP/keyboard-guard.nvim",
+      "category": "Utility",
+      "tags": ["keyboard", "layout", "protection"]
+    }
+  }
+}
