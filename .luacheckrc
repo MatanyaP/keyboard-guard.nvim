@@ -30,7 +30,7 @@ exclude_files = {
 }
 
 -- Max line length
-max_line_length = 120
+max_line_length = 140
 
 -- Max cyclomatic complexity
 max_cyclomatic_complexity = 15
