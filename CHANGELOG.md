@@ -21,3 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Insert mode protection (optional)
 - Customizable notifications
 - Debug commands
+
+## [0.1.1] - 2024-01-23
+
+### Fixed
+
+- Fixed freezing issue in WSL environments
+- Fixed delayed notification queuing
+- Improved layout detection across different environments
+- Added proper caching and debouncing for better performance

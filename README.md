@@ -82,6 +82,15 @@ Debug commands:
 
 The plugin detects your current keyboard layout using native system commands and prevents potentially destructive actions when a non-English layout is active. It's designed to be lightweight and only loads what's necessary for your specific environment.
 
+## 🔧 Troubleshooting
+
+If you experience any issues:
+
+1. Run `:checkhealth keyboard-guard` to verify your environment setup
+2. Use `:KGDebug` to get detailed information about the current state
+3. Try setting `notification.style = "default"` for better visibility during debugging
+4. For WSL users: Make sure PowerShell is accessible from your WSL environment
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for more details.
