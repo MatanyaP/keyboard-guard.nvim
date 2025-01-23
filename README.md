@@ -2,6 +2,8 @@
 
 A Neovim plugin that prevents unintended actions when typing in non-English keyboard layouts. Works across multiple environments (X11, Wayland, Windows, macOS) and provides immediate feedback when typing with a non-English layout.
 
+![Screenshot](screenshots/screenshot1.png)
+
 ## ✨ Features
 
 - Lightweight and performant
