@@ -23,6 +23,32 @@ local defaults = {
     },
 }
 
+-- Increase cache duration for WSL since layout changes are less frequent
+local WSL_CACHE_DURATION = 1000 -- 1 second for WSL
+local DEFAULT_CACHE_DURATION = 100 -- 100ms for other environments
+
+-- Optimized WSL layout detection
+local wsl_layout_detectors = {
+    -- Fast check using PowerShell
+    powershell = function()
+        return safe_system(
+            [[powershell.exe -NonInteractive -NoProfile -Command "[System.Windows.Forms.InputLanguage]::CurrentInputLanguage.Culture.Name"]]
+        )
+    end,
+
+    -- Fallback using Registry
+    registry = function()
+        return safe_system([[reg.exe query "HKEY_CURRENT_USER\\Keyboard Layout\\Preload" /v 1]])
+    end,
+}
+
+-- Cache both the environment check and the detector results
+local cached_wsl_detector = {
+    method = nil,
+    last_check = 0,
+    last_result = true,
+}
+
 -- Safe system command execution
 local function safe_system(cmd)
     local ok, result = pcall(vim.fn.system, cmd)
@@ -71,8 +97,7 @@ local layout_detectors = {
 
     wayland = function()
         if vim.fn.executable("swaymsg") == 1 then
-            local result =
-                safe_system([[swaymsg -t get_inputs | grep "xkb_active_layout_name" | head -1 | cut -d'"' -f4]])
+            local result = safe_system([[swaymsg -t get_inputs | grep "xkb_active_layout_name" | head -1 | cut -d'"' -f4]])
             if result then
                 return result:match("^[Ee]nglish") or result:match("^US") or result:match("^ASCII")
             end
@@ -93,8 +118,7 @@ local layout_detectors = {
 
     windows = function()
         -- Use a more reliable PowerShell command for layout detection
-        local cmd =
-            [[powershell -NoProfile -NonInteractive -Command "[System.Globalization.CultureInfo]::CurrentUICulture.Name"]]
+        local cmd = [[powershell -NoProfile -NonInteractive -Command "[System.Globalization.CultureInfo]::CurrentUICulture.Name"]]
         local result = safe_system(cmd)
 
         -- Add debug logging
@@ -119,25 +143,47 @@ local layout_detectors = {
     end,
 
     wsl = function()
-        -- Try PowerShell through WSL
-        local result =
-            safe_system([[powershell.exe -c "[System.Windows.Forms.InputLanguage]::CurrentInputLanguage.Culture.Name"]])
-        if result and result:match("^en") then
-            return true
+        local current_time = get_timestamp()
+
+        -- Use cached result if fresh enough
+        if (current_time - cached_wsl_detector.last_check) < WSL_CACHE_DURATION then
+            return cached_wsl_detector.last_result
         end
 
-        -- Fallback to checking Windows Registry through WSL
-        result = safe_system([[wsl.exe -- reg.exe query "HKEY_CURRENT_USER\\Keyboard Layout\\Preload" /v 1]])
+        local result = false
+
+        -- Try cached method first
+        if cached_wsl_detector.method then
+            result = wsl_layout_detectors[cached_wsl_detector.method]()
+            if result then
+                cached_wsl_detector.last_result = result:match("^en") or result:match("0+[48]09")
+                cached_wsl_detector.last_check = current_time
+                return cached_wsl_detector.last_result
+            end
+        end
+
+        -- Try PowerShell first
+        result = wsl_layout_detectors.powershell()
         if result then
-            -- Check for English layouts (common values: 00000409, 00000809, etc.)
-            return result:match("0+[48]09")
+            cached_wsl_detector.method = "powershell"
+            cached_wsl_detector.last_result = result:match("^en")
+            cached_wsl_detector.last_check = current_time
+            return cached_wsl_detector.last_result
         end
 
-        -- If all else fails, default to allowing input to prevent freezing
-        vim.notify(
-            "KeyboardGuard: Unable to detect keyboard layout in WSL, defaulting to pass-through",
-            vim.log.levels.WARN
-        )
+        -- Fallback to Registry
+        result = wsl_layout_detectors.registry()
+        if result then
+            cached_wsl_detector.method = "registry"
+            cached_wsl_detector.last_result = result:match("0+[48]09")
+            cached_wsl_detector.last_check = current_time
+            return cached_wsl_detector.last_result
+        end
+
+        -- If both methods fail, cache the failure and default to allowing input
+        cached_wsl_detector.last_result = true
+        cached_wsl_detector.last_check = current_time
+        vim.notify("KeyboardGuard: Layout detection failed, defaulting to pass-through", vim.log.levels.WARN)
         return true
     end,
 
@@ -190,12 +236,18 @@ local layout_cache = { time = get_timestamp(), result = true }
 local CACHE_DURATION = 100 -- milliseconds
 local NOTIFICATION_COOLDOWN = 500 -- milliseconds
 
+-- Update the cache duration based on environment
+local function get_cache_duration()
+    return state.env == "wsl" and WSL_CACHE_DURATION or DEFAULT_CACHE_DURATION
+end
+
 -- Cached layout check
 local function check_layout()
     local current_time = get_timestamp()
+    local cache_duration = get_cache_duration()
 
     -- Use cached result if it's fresh enough
-    if current_time - layout_cache.time < CACHE_DURATION then
+    if current_time - layout_cache.time < cache_duration then
         return layout_cache.result
     end
 

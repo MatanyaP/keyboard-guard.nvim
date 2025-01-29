@@ -8,7 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - Initial development
 
-## [0.1.2] - 2024-01-29
+## [0.1.3] - 2025-01-29
+### Fixed
+- Significantly improved WSL input latency
+- Optimized layout detection caching for WSL
+- Added performance monitoring to health checks
+- Implemented smart fallback for slow layout detection methods
+
+## [0.1.2] - 2025-01-29
 ### Fixed
 - Added proper WSL environment detection
 - Implemented WSL-specific keyboard layout detection with fallback methods
@@ -17,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced health checks for WSL environments
 - Added PowerShell and Registry fallback methods for WSL
 
-## [0.1.1] - 2024-01-23
+## [0.1.1] - 2025-01-23
 ### Fixed
 - Fixed freezing issue in WSL environments
 - Fixed delayed notification queuing
